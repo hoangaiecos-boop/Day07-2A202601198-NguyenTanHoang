@@ -1,7 +1,7 @@
 # Báo Cáo Nhóm — Lab 7: Embedding & Vector Store
 
 **Nhóm:** Nhóm K4 - E-Commerce Policy Experts
-**Thành viên:** Nguyễn Tấn Hoàng (Trưởng nhóm) & Thành viên nhóm K4
+**Thành viên:** Nguyễn Tấn Hoàng (Trưởng nhóm) & Nguyễn Minh Đức
 **Ngày:** 03/08/2026
 
 > **Nộp 1 bản / nhóm.** Phần cá nhân (hướng tiếp cận, kết quả riêng, dự đoán…) mỗi thành viên nộp riêng trong `REPORT_CANHAN.md`. Chi tiết thang điểm: `docs/SCORING.md`.
@@ -56,13 +56,21 @@
 
 ### Phân tích đường cơ sở (Baseline Analysis)
 
-Chạy `ChunkingStrategyComparator().compare()` trên 2-3 tài liệu:
+Chạy trực tiếp (đã bỏ front matter) trên tài liệu **"Quy định chung về trả hàng hoàn tiền"** (6.225 ký tự thân bài, không tính front matter):
 
 | Tài liệu | Chiến lược (Strategy) | Số lượng Chunk | Độ dài trung bình | Giữ được ngữ cảnh không? |
 |-----------|----------|-------------|------------|-------------------|
-| Chính sách đổi trả | FixedSizeChunker (`fixed_size`) | 3 | 450 chars | Có thể cắt đứt câu giữa chunk nếu hết kích thước 500. |
-| Chính sách đổi trả | SentenceChunker (`by_sentences`) | 4 | 280 chars | Giữ trọn vẹn ngữ cảnh từng câu văn, rất dễ đọc. |
-| Chính sách đổi trả | RecursiveChunker (`recursive`) | 2 | 520 chars | Giữ cấu trúc đoạn văn (paragraph) tốt nhất theo các mục 1, 2, 3. |
+| Quy định chung trả hàng hoàn tiền | FixedSizeChunker (`fixed_size`, size=500, overlap=50) | 14 | 491 chars | Cắt theo ký tự cố định, có thể xé đôi câu/mục giữa chunk. |
+| Quy định chung trả hàng hoàn tiền | SentenceChunker (`by_sentences`, 3 câu/chunk) | 10 | 618 chars | Giữ trọn câu nhưng gộp nhiều mục đánh số khác nhau vào cùng 1 chunk. |
+| Quy định chung trả hàng hoàn tiền | RecursiveChunker (`recursive`, size=500) | 14 | 443 chars | Tôn trọng ranh giới đoạn (`\n\n`), nhưng không phân biệt mục đánh số với đoạn văn thường. |
+| Quy định chung trả hàng hoàn tiền | **SectionChunker** (mới, size=500) | 17 | 404 chars | Mỗi chunk = đúng 1 mục đánh số (`1.2.`, `1.3.`...); mục dài bị tách xuống Recursive nhưng vẫn giữ lại tiêu đề mục ở đầu mảnh tiếp theo. |
+
+Số liệu đo lại trên 2 tài liệu dài hơn (kiểm chứng SectionChunker không chỉ tốt trên văn bản ngắn):
+
+| Tài liệu | fixed_size | by_sentences | recursive | **section (mới)** |
+|---|---|---|---|---|
+| Chính sách trả hàng và hoàn tiền (19.609 ký tự) | 44 chunk / 495 chars | 48 chunk / 406 chars | 62 chunk / 314 chars | 72 chunk / 353 chars |
+| Điều khoản dịch vụ Shopee Mall (33.732 ký tự) | 75 chunk / 499 chars | 57 chunk / 588 chars | 101 chunk / 332 chars | 101 chunk / 516 chars |
 
 ### Chiến lược của từng thành viên
 
@@ -70,9 +78,9 @@ Chạy `ChunkingStrategyComparator().compare()` trên 2-3 tài liệu:
 - **Loại chiến lược:** `RecursiveChunker` (`chunk_size=500`, separators=`["\n\n", "\n", ". ", " "]`)
 - **Mô tả & lý do chọn cho chủ đề này:** Phù hợp nhất với văn bản chính sách pháp lý / TMĐT vì giữ nguyên vẹn cấu trúc các tiêu đề mục (`#`, `##`) và toàn bộ một đoạn văn quy định thay vì cắt vụn theo ký tự cố định.
 
-**Thành viên 2 — Thành viên 2 (Sentence Chunker)**
-- **Loại chiến lược:** `SentenceChunker` (`max_sentences_per_chunk=3`)
-- **Mô tả & lý do chọn:** Chia nhỏ văn bản theo ranh giới câu chấm dứt (`.`, `!`, `?`), giúp mỗi chunk chứa chính xác 2-3 câu quy định ngắn gọn, phù hợp với các câu hỏi tra cứu thông tin nhanh.
+**Thành viên 2 — Nguyễn Minh Đức**
+- **Loại chiến lược:** `SectionChunker` (**chunker tự viết**, `chunk_size=500`) — xem `src/chunking.py`. Chạy bằng `bench.py` chung của nhóm, chỉ đổi dòng chọn chunker sang `SectionChunker(chunk_size=500)`.
+- **Mô tả & lý do chọn cho chủ đề này:** Toàn bộ 10 văn bản Shopee được biên soạn theo mục đánh số (`1.`, `1.2.`, `2.7.1.`...), không phải heading Markdown (`#`/`##`). `SectionChunker` tách văn bản ngay tại các dòng mở đầu bằng số mục (regex `^\d+(\.\d+)*\.\s`), coi mỗi mục là một đơn vị ngữ nghĩa trọn vẹn. Khi một mục dài hơn `chunk_size` (ví dụ mục 2.7.2 của Điều khoản Shopee Mall), chunker hạ xuống `RecursiveChunker` để tách tiếp, đồng thời **gắn lại dòng tiêu đề mục** (vd. `"2.7.2. Quy định áp dụng phí..."`) vào đầu mỗi mảnh con — nếu không, mảnh thứ hai trở đi sẽ mất ngữ cảnh biết mình thuộc mục nào.
 
 **Thành viên 3 — Thành viên 3 (Fixed Size Chunker)**
 - **Loại chiến lược:** `FixedSizeChunker` (`chunk_size=400`, `overlap=80`)
@@ -80,14 +88,16 @@ Chạy `ChunkingStrategyComparator().compare()` trên 2-3 tài liệu:
 
 ### So Sánh Giữa Các Thành Viên
 
-| Thành viên | Chiến lược (Strategy) | Điểm truy xuất (/10) | Điểm mạnh | Điểm yếu |
-|-----------|----------|----------------------|-----------|----------|
-| Thành viên 1 | `RecursiveChunker` | 9.5 / 10 | Trích xuất trọn vẹn điều khoản/mục chính sách, câu trả lời Agent mạch lạc. | Đôi khi chunk hơi dài nếu đoạn văn gốc quá lớn. |
-| Thành viên 2 | `SentenceChunker` | 8.5 / 10 | Chunk ngắn, truy xuất câu đơn lẻ rất nhanh và chính xác. | Thiếu ngữ cảnh toàn cục của cả điều khoản. |
-| Thành viên 3 | `FixedSizeChunker` | 7.5 / 10 | Dễ triển khai, chồng chéo giảm đứt câu. | Có thể cắt đôi một từ hoặc câu gây nhiễu embedding. |
+> Điểm ở đây lấy từ số liệu chạy thật qua `bench.py` (mỗi thành viên chỉ đổi dòng chọn chunker, embedder = Mock — xem lưu ý về Mock ở mục 4), không phải ước lượng: "đúng tài liệu" = top-3 chứa đúng `doc_id` của gold answer trên 5 câu hỏi ở mục 3.
+
+| Thành viên | Chiến lược (Strategy) | Số chunk nạp (`k4_shopee`, 10 file) | Đúng tài liệu / 5 câu (Mock) | Điểm mạnh | Điểm yếu |
+|-----------|----------|----------------------|---------|-----------|----------|
+| Thành viên 1 — Nguyễn Tấn Hoàng | `RecursiveChunker(chunk_size=500)` | 288 | 1/5 rõ ràng (câu 2) + 1/5 đúng doc sai đoạn (câu 3) | Tôn trọng ranh giới đoạn (`\n\n`, `\n`), không phụ thuộc cấu trúc mục đánh số. | Không phân biệt được ranh giới giữa các mục quy định khác nhau trong cùng đoạn văn dài. |
+| Thành viên 2 — Nguyễn Minh Đức | `SectionChunker(chunk_size=500)` (tự viết) | 307 | 1/5 rõ ràng (câu 2, cả top-3) + 1/5 đúng doc sai đoạn (câu 3) | Mỗi chunk bám đúng 1 mục quy định (`1.2.`, `2.7.1.`...), tiêu đề mục được giữ lại khi mục dài phải tách tiếp — không mất ngữ cảnh "đang nói về điều mấy". | Sinh nhiều chunk hơn cho văn bản dài (307 vs 288) vì lặp lại dòng tiêu đề ở các mảnh con; phụ thuộc vào việc văn bản có đánh số nhất quán. |
+| Thành viên 3 | *(chưa chạy)* | — | — | — | — |
 
 **Chiến lược nào tốt nhất cho chủ đề này? Tại sao?**
-> **RecursiveChunker** là chiến lược tốt nhất cho chủ đề chính sách TMĐT. Vì văn bản chính sách luôn có cấu trúc phân cấp (Tiêu đề -> Điều khoản -> Danh sách ý), `RecursiveChunker` tôn trọng cấu trúc xuống dòng (`\n\n`, `\n`), giữ trọn vẹn toàn bộ một điều khoản trong cùng một chunk thay vì xé lẻ câu.
+> Với Mock Embedder, cả hai chiến lược cho kết quả retrieval gần như nhau về số lượng đúng/sai (khác biệt nằm ở *chất lượng ranh giới chunk*, chưa thể hiện rõ qua điểm số vì Mock không hiểu ngữ nghĩa — xem mục 4). Về mặt cấu trúc: **SectionChunker** bám sát quy ước hành văn thật của corpus (các mục đánh số `1.`, `1.2.`, `2.7.1.`) nên mỗi chunk là đúng một đơn vị quy định — phù hợp khi câu hỏi cần trích dẫn "đúng điều mấy". **RecursiveChunker** tổng quát hơn, không giả định về định dạng đánh số, nên an toàn hơn nếu áp dụng cho nguồn dữ liệu khác không theo quy ước này. Với corpus hiện tại (toàn bộ đều đánh số mục rõ ràng), nhóm nghiêng về **SectionChunker** cho giai đoạn sản xuất, nhưng cần đánh giá lại bằng embedder ngữ nghĩa thật trước khi kết luận chắc chắn.
 
 ---
 
@@ -97,26 +107,32 @@ Chạy `ChunkingStrategyComparator().compare()` trên 2-3 tài liệu:
 
 > **Đúng 5 câu hỏi**, đa dạng, có thể kiểm chứng; **ít nhất 1 câu** cần lọc metadata mới trả lời tốt. Đây là bộ câu hỏi chung cho mọi thành viên chạy.
 
+> **Ghi chú (03/08/2026):** Gold answer bên dưới đã được xác minh bằng `grep` trực tiếp trên `data/k4_shopee/*.md` — bản trước có vài số liệu không khớp corpus (7 ngày thay vì 15 ngày, phạt "200%" thay vì mức thật 9.818.180đ/100% giá trị, cơ chế "giữ tiền thanh toán" không có trong `shopee-dam-bao.md`). Đã sửa lại theo đúng văn bản gốc; câu 3 và câu 4 có phần câu hỏi vượt quá chi tiết mà tài liệu hiện có cung cấp — gold answer ghi rõ giới hạn đó thay vì bịa thêm.
+
 | # | Câu hỏi (Query) | Câu trả lời chuẩn (Gold Answer) | Chunk nào chứa thông tin? |
 |---|-------|-------------------------------|--------------------------|
-| 1 | Thời hạn gửi yêu cầu Trả hàng / Hoàn tiền trên Shopee là bao nhiêu ngày kể từ khi nhận hàng? | Người mua có thể gửi yêu cầu Trả hàng/Hoàn tiền trong vòng 7 ngày (hoặc 15 ngày đối với sản phẩm thuộc Shopee Mall) kể từ khi đơn hàng cập nhật trạng thái Giao hàng thành công. | `quy-dinh-chung-tra-hang-hoan-tien` / `chinh-sach-tra-hang-hoan-tien` |
-| 2 | *(Lọc Metadata: `customer_role="seller"`)* Người bán Shopee Mall có nghĩa vụ gì về hàng chính hãng và mức bồi thường khi phát hiện bán hàng giả là bao nhiêu? | Người bán Shopee Mall cam kết 100% hàng chính hãng. Nếu phát hiện bán hàng giả/nhái, Shopee Mall phạt và hoàn 200% giá trị sản phẩm cho Người mua từ chi phí của Người bán. | `dieu-khoan-dich-vu-shopee-mall` |
-| 3 | Shopee quy định như thế nào về việc đồng kiểm khi nhận hàng từ đơn vị vận chuyển? | Người mua được phép đồng kiểm (mở hộp kiểm tra số lượng, ngoại quan, không dùng thử sản phẩm) trước mặt nhân viên giao hàng khi nhận đơn hàng. | `chinh-sach-van-chuyen` |
-| 4 | Tính năng "Shopee Đảm Bảo" bảo vệ Người mua như thế nào và giữ tiền thanh toán trong bao lâu? | Shopee Đảm Bảo giữ tiền thanh toán của Người mua cho đến khi Người mua xác nhận đã nhận hàng thỏa đáng hoặc hết thời hạn Trả hàng/Hoàn tiền (7-15 ngày). | `shopee-dam-bao` |
-| 5 | Quy định đóng gói đơn hàng hoàn trả về cho Shopee hoặc Người bán cần đáp ứng những yêu cầu gì? | Hàng hoàn trả phải đóng gói kỹ bằng thùng carton/túi niêm phong nguyên vẹn, dán Mã trả hàng/Phiếu giao hoàn trả bên ngoài và kèm đầy đủ phụ kiện, quà tặng đi kèm. | `cach-dong-goi-don-hoan-tra` |
+| 1 | Thời hạn gửi yêu cầu Trả hàng / Hoàn tiền trên Shopee là bao nhiêu ngày kể từ khi nhận hàng? | Thông thường 15 ngày kể từ khi đơn hàng cập nhật "Giao hàng thành công" (20 ngày nếu Người bán tự vận chuyển và Người mua chưa bấm "Đã nhận được hàng"). Ngoại lệ: thực phẩm tươi sống & đông lạnh chỉ có 24 giờ (trừ lý do "Chưa nhận được hàng"). | `quy-dinh-chung-tra-hang-hoan-tien` |
+| 2 | *(Lọc Metadata: `customer_role="seller"`)* Người bán Shopee Mall có nghĩa vụ gì về hàng chính hãng và mức bồi thường khi phát hiện bán hàng giả là bao nhiêu? | Người bán Shopee Mall cam kết mọi sản phẩm là hàng chính hãng, chưa qua sử dụng, không bị cấm kinh doanh; nghiêm cấm đăng bán hàng giả/nhái. Nếu Shopee phát hiện vi phạm, Người bán phải trả phí bằng **9.818.180 VNĐ hoặc 100% giá trị Sản Phẩm (tùy giá trị nào cao hơn)** cho mỗi sản phẩm vi phạm, trong vòng 7 ngày lịch; vi phạm 2 lần sẽ bị loại khỏi Shopee Mall. | `dieu-khoan-dich-vu-shopee-mall` (mục 2.7.1–2.7.2) |
+| 3 | Shopee quy định như thế nào về việc đồng kiểm khi nhận hàng từ đơn vị vận chuyển? | Về nguyên tắc, dịch vụ vận chuyển trên Shopee **không** cho phép Người mua kiểm tra hàng trước khi thanh toán và nhận hàng, **trừ những đơn hàng được đồng kiểm** — chi tiết quy trình đồng kiểm được dẫn tới các điều khoản chương trình đồng kiểm riêng (không nằm trong corpus đã thu thập). | `chinh-sach-van-chuyen` (mục E) |
+| 4 | Tính năng "Shopee Đảm Bảo" bảo vệ Người mua như thế nào và giữ tiền thanh toán trong bao lâu? | Shopee Đảm Bảo bảo vệ Người mua bằng cách cho phép gửi yêu cầu Trả hàng/Hoàn tiền trong vòng **15 ngày** kể từ khi đơn hàng cập nhật "Giao hàng thành công". Nếu đơn hàng chưa được giao đúng hạn, Shopee phản hồi kết quả xử lý trong **3-5 ngày làm việc**. Tài liệu không mô tả rõ cơ chế "giữ tiền thanh toán" (escrow) — chỉ nêu thời hạn bảo vệ quyền trả hàng/hoàn tiền nói trên. | `shopee-dam-bao` |
+| 5 | Quy định đóng gói đơn hàng hoàn trả về cho Shopee hoặc Người bán cần đáp ứng những yêu cầu gì? | Chuẩn bị vật liệu đóng gói (hộp carton/bao bì, băng dính, vật liệu chèn) và phiếu gửi hàng; quay video toàn bộ quá trình đóng gói; đóng gói theo tiêu chuẩn Shopee hoặc như khi nhận hàng, dùng hộp vận chuyển ngoài (không viết/dán lên hộp của nhà sản xuất); dán/viết mã vận đơn hoặc phiếu gửi hàng tùy hình thức trả hàng. Với hàng dễ vỡ/chứa chất lỏng: đóng chặt nắp, dùng thùng vừa kích cỡ và vật liệu đệm (bong bóng khí, màng co, xốp). | `cach-dong-goi-don-hoan-tra` |
 
 ### Tổng hợp chất lượng truy xuất của nhóm
 
-| # | Câu hỏi | Chiến lược tốt nhất cho câu này | Có chunk liên quan trong top-3? | Ghi chú |
-|---|---------|-------------------------------|-------------------------------|---------|
-| 1 | Thời hạn Trả hàng / Hoàn tiền | `RecursiveChunker` | Có (Top-1) | Truy xuất chính xác thời hạn 7 ngày / 15 ngày đối với Shopee Mall. |
-| 2 | Hàng chính hãng Shopee Mall & Phạt 200% | `RecursiveChunker` + Metadata Filter | Có (Top-1) | Lọc `customer_role="seller"` trích xuất chính xác Điều khoản dịch vụ Shopee Mall. |
-| 3 | Quy định đồng kiểm khi nhận hàng | `RecursiveChunker` / `Sentence` | Có (Top-1) | Lấy chính xác điều khoản đồng kiểm ngoại quan trong chính sách vận chuyển. |
-| 4 | Shopee Đảm Bảo giữ tiền thanh toán | `RecursiveChunker` | Có (Top-1) | Trích xuất điều khoản bảo vệ người mua của tính năng Shopee Đảm Bảo. |
-| 5 | Quy định đóng gói đơn hàng hoàn trả | `RecursiveChunker` | Có (Top-1) | Trả về quy định đóng gói thùng carton và mã trả hàng ngoài vỏ hộp. |
+> Kết quả dưới đây chạy thật qua `bench.py` (chiến lược `RecursiveChunker(chunk_size=500)`, embedder = Mock — xem lưu ý về Mock ở mục 4). "Đúng tài liệu" nghĩa là top-3 chứa ít nhất 1 chunk từ đúng `doc_id` nêu ở gold answer; Mock không hiểu ngữ nghĩa nên nhiều câu chỉ khớp tình cờ theo từ khóa, chưa phản ánh chất lượng thật — nhóm sẽ đánh giá lại bằng `EMBEDDING_PROVIDER=local` trước khi thuyết trình.
+
+| # | Câu hỏi | Đúng tài liệu trong top-3 (Mock)? | Ghi chú |
+|---|---------|-------------------------------|---------|
+| 1 | Thời hạn Trả hàng / Hoàn tiền | Không | Top-3 trả về `chinh-sach-van-chuyen`, `dieu-khoan-dich-vu-shopee-mall`, `chinh-sach-tra-hang-hoan-tien` — thiếu đúng nguồn `quy-dinh-chung-tra-hang-hoan-tien`. |
+| 2 | Hàng chính hãng Shopee Mall & mức phí vi phạm | Có (Top-1, cả 3/3) | Với filter `customer_role="seller"`, cả top-3 đều thuộc `dieu-khoan-dich-vu-shopee-mall` — đúng nguồn. |
+| 3 | Quy định đồng kiểm khi nhận hàng | Đúng doc, sai đoạn | Top-1/2 đúng `chinh-sach-van-chuyen` nhưng lấy nhầm đoạn về kích thước hàng cồng kềnh, không phải mục E (đồng kiểm). |
+| 4 | Shopee Đảm Bảo giữ tiền thanh toán | Không | Top-1 lấy nhầm `dieu-khoan-dich-vu-shopee-mall`; đúng nguồn `shopee-dam-bao` không xuất hiện trong top-3. |
+| 5 | Quy định đóng gói đơn hàng hoàn trả | Không | Top-1 lấy nhầm `chinh-sach-van-chuyen`; đúng nguồn `cach-dong-goi-don-hoan-tra` không xuất hiện trong top-3. |
 
 **Lọc bằng metadata có giúp ích không? Ở câu hỏi nào?**
-> Lọc bằng metadata **rất giúp ích** (đặc biệt ở câu 2 với bộ lọc `metadata_filter={"customer_role": "seller"}`). Giữa 229 chunks trong tập tài liệu Shopee lớn (`k4_shopee`), việc lọc `customer_role="seller"` giúp loại bỏ 100% các điều hướng dành cho người mua, đưa chính xác các điều khoản chế tài của Shopee Mall lên Top-1.
+> Có, và có bằng chứng đo được ở câu 2. Chạy `store.search()` (không lọc) cho câu 2 trả về top-1 = `chinh-sach-tra-hang-hoan-tien` (score 0.369, tài liệu `customer_role="both"` nói về lý do trả hàng hàng giả từ góc độ Người mua) — **sai ngữ cảnh** vì câu hỏi hỏi về nghĩa vụ/mức phạt của Người bán. Khi thêm `metadata_filter={"customer_role": "seller"}`, top-1/2/3 đều chuyển thành `dieu-khoan-dich-vu-shopee-mall` (đúng tài liệu duy nhất mang `customer_role="seller"`). Đây đúng là trường hợp "1 câu hỏi chỉ trả lời đúng khi có filter" theo yêu cầu đề bài.
+>
+> Ngược lại, 3/5 câu (1, 4, 5) sai tài liệu ngay cả khi có/không filter — cho thấy giới hạn thật của Mock Embedder (băm ký tự, không hiểu ngữ nghĩa) chứ không phải lỗi của chiến lược chunking. Cần chạy lại với embedder ngữ nghĩa thật trước khi kết luận về chất lượng truy xuất.
 
 
 ---

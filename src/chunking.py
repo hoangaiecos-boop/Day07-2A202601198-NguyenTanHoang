@@ -133,6 +133,56 @@ class RecursiveChunker:
         return final_chunks
 
 
+class SectionChunker:
+    """
+    Split text by numbered clause headings (e.g. "1.2.", "2.7.1."), the
+    convention used throughout this corpus of Shopee policy documents.
+
+    Each clause is treated as one semantic unit. A clause that exceeds
+    chunk_size is handed to RecursiveChunker, and its heading is re-attached
+    to every resulting piece so later fragments don't lose their clause
+    context (e.g. "2.7.2. ..." would otherwise read as an orphan paragraph).
+    """
+
+    HEADING_RE = re.compile(r"^(\d+(?:\.\d+)*\.\s+\S.*)$", re.M)
+
+    def __init__(self, chunk_size: int = 500) -> None:
+        self.chunk_size = chunk_size
+
+    def chunk(self, text: str) -> list[str]:
+        if not text or not text.strip():
+            return []
+
+        matches = list(self.HEADING_RE.finditer(text))
+        if not matches:
+            return RecursiveChunker(chunk_size=self.chunk_size).chunk(text)
+
+        chunks: list[str] = []
+        intro = text[: matches[0].start()].strip()
+        if intro:
+            chunks.append(intro)
+
+        for index, match in enumerate(matches):
+            start = match.start()
+            end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+            section = text[start:end].strip()
+            if not section:
+                continue
+
+            if len(section) <= self.chunk_size:
+                chunks.append(section)
+                continue
+
+            heading_line = match.group(1).strip()
+            for piece_index, piece in enumerate(RecursiveChunker(chunk_size=self.chunk_size).chunk(section)):
+                if piece_index == 0 or piece.startswith(heading_line):
+                    chunks.append(piece)
+                else:
+                    chunks.append(f"{heading_line}\n{piece}")
+
+        return chunks
+
+
 def _dot(a: list[float], b: list[float]) -> float:
     return sum(x * y for x, y in zip(a, b))
 
