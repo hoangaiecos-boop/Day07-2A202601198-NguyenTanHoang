@@ -1,7 +1,7 @@
 """
-bench.py — benchmark chiến lược chunking cá nhân (Nguyễn Tấn Hoàng).
+bench.py — benchmark chiến lược chunking cá nhân (Nguyễn Minh Đức).
 
-Chiến lược riêng: RecursiveChunker(chunk_size=500) — DÒNG DUY NHẤT khác với
+Chiến lược riêng: SectionChunker(chunk_size=500) — DÒNG DUY NHẤT khác với
 các thành viên khác trong nhóm. Mọi phần còn lại (corpus, embedder, 5 câu hỏi)
 dùng chung để so sánh công bằng.
 """
@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 
 from ingest import build_knowledge_base
 from src.agent import KnowledgeBaseAgent
-from src.chunking import RecursiveChunker
+from src.chunking import SectionChunker
 from src.embeddings import (
     EMBEDDING_PROVIDER_ENV,
     LOCAL_EMBEDDING_MODEL,
@@ -66,7 +66,7 @@ def main() -> int:
         return 1
 
     # 1. Chọn chunker của riêng bạn.
-    chunker = RecursiveChunker(chunk_size=500)
+    chunker = SectionChunker(chunk_size=500)
 
     embedder = _select_embedder()
     backend = getattr(embedder, "_backend_name", embedder.__class__.__name__)
