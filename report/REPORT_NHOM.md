@@ -84,6 +84,7 @@ Nhận xét:
 | Trần Thanh Huyền | `RecursiveChunker(chunk_size=400)` | Mock fallback | 371 | Có top-3, score và preview cho đủ 5 câu. |
 | Đỗ Tú Anh | `RecursiveChunker(chunk_size=450)` | Mock fallback | 324 | Có top-3, score và preview cho đủ 5 câu. |
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 | Nguyễn Minh Đức | `SectionChunker(chunk_size=500)` | Mock fallback | 307 | Có top-3, score, preview và agent answer cho đủ 5 câu trong `OUTPUT_NGUYEN_MINH_DUC.txt`. |
 
 **Giới hạn so sánh:** output hiện có chưa đáp ứng trọn vẹn khuyến nghị “mỗi thành viên thử một chiến lược khác nhau”: bốn thành viên dùng Recursive với hai kích thước, còn Nguyễn Minh Đức dùng SectionChunker. Ngoài ra backend và phiên bản corpus/code không đồng nhất (307, 324, 371 và 375 chunk), nên không thể quy toàn bộ chênh lệch chất lượng cho chunking. Dù SectionChunker tạo ít chunk nhất và giữ được số mục trong preview, kết quả của cấu hình này vẫn bị chi phối bởi Mock embedding.
@@ -106,6 +107,21 @@ Trong corpus hiện tại, Recursive là lựa chọn an toàn hơn Fixed-size v
 3. Gắn lại dòng tiêu đề mục vào mọi mảnh con để không mất ngữ cảnh (vd. mục 2.7.2 dài của Điều khoản Shopee Mall).
 4. *(Chưa làm ở vòng này):* bổ sung `section_title`, `clause_number`, `clause_type` vào metadata của chunk — xem mục 4.2.
 
+=======
+| Nguyễn Minh Đức | `SectionChunker(chunk_size=500)` (**chunker tự viết**, xem `src/chunking.py`) | Mock fallback | 307 | Có top-3, score, preview và agent answer cho đủ 5 câu (chạy qua `bench.py`, `EMBEDDING_PROVIDER=mock`). |
+
+**Giới hạn so sánh:** bốn thành viên dùng `RecursiveChunker` (chunk_size 400–450); riêng Nguyễn Minh Đức dùng `SectionChunker` — một chunker tự viết, tách theo mục đánh số (`1.`, `1.2.`, `2.7.1.`...) thay vì theo separator tổng quát. Đây là chiến lược thật sự khác biệt duy nhất trong nhóm hiện có bằng chứng đầy đủ; các thành viên còn lại vẫn nên bổ sung Fixed-size/Sentence để đáp ứng trọn vẹn khuyến nghị “mỗi người một chiến lược”. Ngoài ra backend và phiên bản corpus/code không đồng nhất (371, 375, 324 và 307 chunk), nên không thể quy toàn bộ chênh lệch chất lượng cho chunking.
+
+### 2.3. Đánh giá thiết kế
+
+Trong corpus hiện tại, Recursive là lựa chọn an toàn hơn Fixed-size vì tôn trọng các ranh giới tự nhiên. Tuy nhiên, cấu trúc tài liệu có nhiều mục đánh số như `1.9.4`, `2.7.1`, `2.7.2`; nhóm đã hiện thực và **chạy thật** một phương án phù hợp hơn — **`SectionChunker`** (Nguyễn Minh Đức, `src/chunking.py`):
+
+1. Tách trước tại các dòng mở đầu bằng số mục (regex `^\d+(\.\d+)*\.\s`) — corpus dùng quy ước đánh số này, không phải heading Markdown.
+2. Chỉ dùng `RecursiveChunker` để chia tiếp khi một mục vượt `chunk_size`.
+3. Gắn lại dòng tiêu đề mục vào mọi mảnh con để không mất ngữ cảnh (vd. mục 2.7.2 dài của Điều khoản Shopee Mall).
+4. *(Chưa làm ở vòng này):* bổ sung `section_title`, `clause_number`, `clause_type` vào metadata của chunk — xem mục 4.2.
+
+>>>>>>> Stashed changes
 Kết quả đo được (mục 2.2, 3.3, 3.5): với Mock embedder, `SectionChunker` sinh nhiều chunk hơn Recursive trên tài liệu dài (307 so với 371–375) nhưng **không cải thiện Hit@3 đã xác minh** (0/5, xem 3.3) — cùng mức với cấu hình Recursive 450 của Đỗ Tú Anh. Đây là bằng chứng ủng hộ kết luận ở mục 4.1: với corpus và bộ câu hỏi này, **Mock embedder là nút thắt chính**, không phải lựa chọn chunker; ranh giới chunk tốt hơn (đúng 1 mục/chunk) chỉ có giá trị khi embedder đủ khả năng phân biệt ngữ nghĩa giữa các mục.
 
 ---
@@ -130,6 +146,10 @@ Các con số “7 ngày/15 ngày cho Shopee Mall”, “hoàn 200%” và mô t
 - **△:** có chunk đúng chủ đề/tài liệu nhưng bằng chứng chỉ trả lời một phần.
 - **✗:** không có chunk trả lời được câu hỏi.
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+- **BC:** chỉ là số liệu thành viên tự báo cáo, thiếu raw output để xác minh (không còn áp dụng cho thành viên nào sau khi Nguyễn Minh Đức bổ sung raw log).
+>>>>>>> Stashed changes
 =======
 - **BC:** chỉ là số liệu thành viên tự báo cáo, thiếu raw output để xác minh (không còn áp dụng cho thành viên nào sau khi Nguyễn Minh Đức bổ sung raw log).
 >>>>>>> Stashed changes
@@ -145,7 +165,11 @@ Các con số “7 ngày/15 ngày cho Shopee Mall”, “hoàn 200%” và mô t
 | Trần Thanh Huyền | ✗ | ✗ | ✗ | ✗ | △ | **1/5 một phần** | Q5 top-1 đúng tài liệu và hướng dẫn dán/viết mã vận đơn, chưa bao quát toàn bộ yêu cầu đóng gói. |
 | Đỗ Tú Anh | ✗ | ✗ | ✗ | ✗ | ✗ | **0/5** | Cờ “marker” ở Q1 là false positive vì từ “Shopee Mall” xuất hiện trong chunk không trả lời thời hạn. |
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 | Nguyễn Minh Đức | ✗ | ✗ | ✗ | ✗ | ✗ | **0/5** | Raw log cho thấy top-3 của cả 5 câu đều không chứa bằng chứng cần tìm; bảng 5/5 trong báo cáo cá nhân dùng số liệu tóm tắt không khớp lần chạy. |
+=======
+| Nguyễn Minh Đức | ✗ | ✗ | ✗ | ✗ | ✗ | **0/5** | `SectionChunker(500)` + Mock, 307 chunk. Q2 top-3 đều đúng `dieu-khoan-dich-vu-shopee-mall` (filter seller hoạt động) nhưng lấy nhầm mục 1.2/2.11, không phải 2.7. Q3 top-1/2 đúng `chinh-sach-van-chuyen` nhưng lấy nhầm đoạn hàng hóa có điều kiện/khiếu nại, không phải mục E.1. Q1, Q4, Q5 sai tài liệu hoàn toàn. |
+>>>>>>> Stashed changes
 =======
 | Nguyễn Minh Đức | ✗ | ✗ | ✗ | ✗ | ✗ | **0/5** | `SectionChunker(500)` + Mock, 307 chunk. Q2 top-3 đều đúng `dieu-khoan-dich-vu-shopee-mall` (filter seller hoạt động) nhưng lấy nhầm mục 1.2/2.11, không phải 2.7. Q3 top-1/2 đúng `chinh-sach-van-chuyen` nhưng lấy nhầm đoạn hàng hóa có điều kiện/khiếu nại, không phải mục E.1. Q1, Q4, Q5 sai tài liệu hoàn toàn. |
 >>>>>>> Stashed changes
@@ -169,12 +193,15 @@ Kết quả Nguyễn Tấn Hoàng — `RecursiveChunker(400)` + `voyage-multilin
 | Câu | Nguyễn Minh Hiếu — Recursive 400 | Trần Thanh Huyền — Recursive 400 | Đỗ Tú Anh — Recursive 450 | Nguyễn Minh Đức — Section 500 |
 |---:|---|---|---|---|
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 | Q1 | `chinh-sach-van-chuyen` (0,334) — sai | `chinh-sach-van-chuyen` (0,334) — sai | `chinh-sach-van-chuyen` (0,422) — sai | `dieu-khoan...mall`, mục 2.12 (0,337) — sai |
 | Q2, sau filter | `dieu-khoan...mall` (0,311) — đúng doc, sai mục | `dieu-khoan...mall` (0,330) — đúng doc, sai mục | `dieu-khoan...mall` (0,311) — đúng doc, sai mục | `dieu-khoan...mall`, mục 1.2 (0,300) — đúng doc, sai mục |
 | Q3 | `chinh-sach-tra-hang...` (0,307) — sai | `chinh-sach-tra-hang...` (0,307) — sai | `chinh-sach-van-chuyen` (0,341) — đúng doc, sai đoạn | `chinh-sach-van-chuyen`, hàng vận chuyển có điều kiện (0,355) — đúng doc, sai đoạn |
 | Q4 | `chinh-sach-tra-hang...` (0,322) — sai | `dieu-khoan...mall` (0,314) — sai | `chinh-sach-van-chuyen` (0,313) — sai | `chinh-sach-van-chuyen`, bồi thường (0,353) — sai |
 | Q5 | `cach-dong-goi...` (0,341) — liên quan | `cach-dong-goi...` (0,341) — liên quan một phần | `chinh-sach-tra-hang...` (0,314) — sai | `quy-dinh-chung...`, lý do trả hàng (0,361) — sai |
 =======
+=======
+>>>>>>> Stashed changes
 | Q1 | `chinh-sach-van-chuyen` (0,334) — sai | `chinh-sach-van-chuyen` (0,334) — sai | `chinh-sach-van-chuyen` (0,422) — sai | `dieu-khoan...mall` (0,337) — sai |
 | Q2, sau filter | `dieu-khoan...mall` (0,311) — đúng doc, sai mục | `dieu-khoan...mall` (0,330) — đúng doc, sai mục | `dieu-khoan...mall` (0,311) — đúng doc, sai mục | `dieu-khoan...mall` (0,300) — đúng doc, sai mục |
 | Q3 | `chinh-sach-tra-hang...` (0,307) — sai | `chinh-sach-tra-hang...` (0,307) — sai | `chinh-sach-van-chuyen` (0,341) — đúng doc, sai đoạn | `chinh-sach-van-chuyen` (0,355) — đúng doc, sai đoạn |
@@ -190,6 +217,9 @@ Raw top-3 đầy đủ (Nguyễn Minh Đức, `SectionChunker(500)` + Mock, 307 
 | Q3 | `chinh-sach-van-chuyen` (0,355) — mục 2 (hàng hóa có điều kiện) | `chinh-sach-van-chuyen` (0,326) — mục 2 (thời gian xử lý khiếu nại) | `chinh-sach-tra-hang...` (0,300) — mục 3.1 (điều kiện trả hàng) |
 | Q4 | `chinh-sach-van-chuyen` (0,353) — mục 4 (bồi thường) | `chinh-sach-van-chuyen` (0,336) — mục 3 (hàng hóa đặc thù) | `dieu-khoan...mall` (0,314) — mục 1.9.4 (thời hạn khiếu nại seller) |
 | Q5 | `quy-dinh-chung...` (0,361) — mục 1.3 (lý do trả hàng) | `quy-trinh-xu-ly-thht` (0,317) — mục 5.3 (đánh giá trải nghiệm) | `chinh-sach-tra-hang...` (0,285) — mục 3.1 (điều kiện trả hàng) |
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 
 ### 3.6. Chiến lược nào tốt nhất và metadata có giúp không?
@@ -201,7 +231,11 @@ Metadata filtering có ích rõ ở Q2:
 - Không filter, các output Mock thường đưa tài liệu vận chuyển hoặc trả hàng lên cao vì cùng chứa từ “Người bán”, “hàng giả” hoặc “phí”.
 - Với `customer_role="seller"`, top-3 được giới hạn vào `dieu-khoan-dich-vu-shopee-mall`.
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 - Filter đúng tài liệu vẫn chưa bảo đảm đúng **điều khoản**: cả bốn output Mock đều bỏ lỡ mục 2.7. Điều này cho thấy cần kết hợp semantic embedding và metadata chi tiết như `clause_number=2.7` hoặc `clause_type=che_tai`.
+=======
+- Filter đúng tài liệu vẫn chưa bảo đảm đúng **điều khoản**: cả bốn output Mock (kể cả `SectionChunker` của Nguyễn Minh Đức, vốn tách đúng từng mục làm một chunk) đều bỏ lỡ mục 2.7. Điều này cho thấy vấn đề nằm ở **embedder**, không phải ranh giới chunk: dù `SectionChunker` đã tách "1.2", "2.7.1", "2.11" thành các chunk riêng biệt sạch sẽ, Mock vẫn không phân biệt được chunk nào ngữ nghĩa gần với câu hỏi nhất — cần kết hợp semantic embedding thật và metadata chi tiết như `clause_number=2.7` hoặc `clause_type=che_tai`.
+>>>>>>> Stashed changes
 =======
 - Filter đúng tài liệu vẫn chưa bảo đảm đúng **điều khoản**: cả bốn output Mock (kể cả `SectionChunker` của Nguyễn Minh Đức, vốn tách đúng từng mục làm một chunk) đều bỏ lỡ mục 2.7. Điều này cho thấy vấn đề nằm ở **embedder**, không phải ranh giới chunk: dù `SectionChunker` đã tách "1.2", "2.7.1", "2.11" thành các chunk riêng biệt sạch sẽ, Mock vẫn không phân biệt được chunk nào ngữ nghĩa gần với câu hỏi nhất — cần kết hợp semantic embedding thật và metadata chi tiết như `clause_number=2.7` hoặc `clause_type=che_tai`.
 >>>>>>> Stashed changes
@@ -230,7 +264,11 @@ Metadata filtering có ích rõ ở Q2:
 ### 4.2. Failure case 2 — Đúng tài liệu nhưng sai chunk
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 **Câu thất bại:** Q2 với filter seller trong cả bốn output Mock.
+=======
+**Câu thất bại:** Q2 với filter seller trong bốn output Mock (kể cả `SectionChunker`).
+>>>>>>> Stashed changes
 =======
 **Câu thất bại:** Q2 với filter seller trong bốn output Mock (kể cả `SectionChunker`).
 >>>>>>> Stashed changes
@@ -294,6 +332,7 @@ Riêng báo cáo cá nhân Nguyễn Minh Đức tóm tắt top-1 với các scor
 | Metadata bắt buộc + ít nhất hai trường retrieval | Đạt | Mục 1.3 |
 | Baseline trên 2–3 tài liệu | Đạt | Mục 2.1 (3 tài liệu) |
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 | Mỗi thành viên có chiến lược riêng | Đạt một phần | Bốn thành viên dùng Recursive (400/450), Nguyễn Minh Đức dùng SectionChunker 500; chưa có năm chiến lược khác nhau. |
 | Đúng 5 câu hỏi, đa dạng và có gold answer | Đạt sau hiệu chỉnh | Mục 3.1 |
 | Ít nhất một câu cần metadata filter | Đạt | Q2 |
@@ -304,10 +343,17 @@ Riêng báo cáo cá nhân Nguyễn Minh Đức tóm tắt top-1 với các scor
 | Ít nhất một câu cần metadata filter | Đạt | Q2 |
 | So sánh top-3 của 5 thành viên | Đạt | Mục 3.3–3.5; cả 5 thành viên đều có raw output với top-3, score và preview. |
 >>>>>>> Stashed changes
+=======
+| Mỗi thành viên có chiến lược riêng | Đạt một phần | 4/5 raw output dùng Recursive (400–450); Nguyễn Minh Đức dùng `SectionChunker` tự viết (khác biệt thật, mục 2.2–2.3). Vẫn thiếu Fixed-size/Sentence để phủ hết các chiến lược có sẵn. |
+| Đúng 5 câu hỏi, đa dạng và có gold answer | Đạt sau hiệu chỉnh | Mục 3.1 |
+| Ít nhất một câu cần metadata filter | Đạt | Q2 |
+| So sánh top-3 của 5 thành viên | Đạt | Mục 3.3–3.5; cả 5 thành viên đều có raw output với top-3, score và preview. |
+>>>>>>> Stashed changes
 | Thảo luận chiến lược tốt nhất và tác dụng metadata | Đạt | Mục 3.6–3.7 |
 | Ít nhất một failure case và đề xuất cải thiện | Đạt | Mục 4.1–4.4 |
 | Bài học và nội dung demo | Đạt | Mục 4.5–4.7 |
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 **Việc cần hoàn thiện trước khi nộp nếu còn thời gian:** Các thành viên chạy lại năm chiến lược khác nhau trên cùng semantic embedder/corpus và sinh bảng tóm tắt trực tiếp từ raw log. Raw benchmark và cấu hình của Nguyễn Minh Đức đã được bổ sung, nhưng cần chạy lại bằng semantic embedding thật để đánh giá công bằng SectionChunker.
 
@@ -322,6 +368,9 @@ Riêng báo cáo cá nhân Nguyễn Minh Đức tóm tắt top-1 với các scor
 | Chất lượng truy xuất (Retrieval Quality) | 10 / 10 |
 | Thuyết trình (Demo) | 5 / 5 |
 | **Tổng phần nhóm** | **40 / 40** |
+=======
+**Việc cần hoàn thiện trước khi nộp nếu còn thời gian:** các thành viên còn lại (Hiếu, Huyền, Tú Anh) nên thử thêm Fixed-size/Sentence hoặc `SectionChunker` để nhóm có đủ năm chiến lược khác nhau; và toàn bộ 5 output nên chạy lại trên cùng một semantic embedder thật (Voyage hoặc `sentence-transformers`) thay vì trộn Voyage/Mock như hiện tại, vì mục 3.6–3.7 cho thấy embedder ảnh hưởng đến kết quả nhiều hơn lựa chọn chunker. Báo cáo hiện tại không tự tạo số liệu để che khoảng trống này.
+>>>>>>> Stashed changes
 =======
 **Việc cần hoàn thiện trước khi nộp nếu còn thời gian:** các thành viên còn lại (Hiếu, Huyền, Tú Anh) nên thử thêm Fixed-size/Sentence hoặc `SectionChunker` để nhóm có đủ năm chiến lược khác nhau; và toàn bộ 5 output nên chạy lại trên cùng một semantic embedder thật (Voyage hoặc `sentence-transformers`) thay vì trộn Voyage/Mock như hiện tại, vì mục 3.6–3.7 cho thấy embedder ảnh hưởng đến kết quả nhiều hơn lựa chọn chunker. Báo cáo hiện tại không tự tạo số liệu để che khoảng trống này.
 >>>>>>> Stashed changes
